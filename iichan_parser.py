@@ -214,10 +214,10 @@ class Iichan_parser(object):
 			path = '/'.join(source_url.split('/')[:-1])
 			expanded_url = '%s/%s'%(path, url)
 		fn = url.split('/')[-1]
-		fn = '%s/%s'%(files_path, fn)
+		#fn = '%s/%s'%(files_path, fn)
 		return (expanded_url, fn)
 
-	def save_local(self, url):
+	def save_local(self, url, path=None):
 		html_data = self.html_data(url)
 		tid = self.thread_id(html_data)
 		posts = self.parse_data(html_data, tid)
@@ -225,7 +225,11 @@ class Iichan_parser(object):
 		parsed_uri = urlparse.urlparse(url)
 		host = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
 
-		files_path = '%s_files'%tid
+		html_file_prefix = '%s_files/'%tid
+		if path <> None:
+			files_path = '%s/%s'%(path, html_file_prefix)
+		else:
+			files_path = html_file_prefix
 		if not os.path.exists(files_path) or not os.path.isdir(files_path):
 			os.makedirs(files_path)
 
@@ -234,20 +238,20 @@ class Iichan_parser(object):
 			for attr in l.items():
 				if 'href' == attr[0]:
 					(ex_url, fn) = self.url_to_filename(attr[1], url, files_path)
-					if not os.path.exists(fn):
+					if not os.path.exists(files_path + fn):
 						print 'Downloading... %s'%ex_url
-						urllib.urlretrieve(ex_url, fn)
-					l.attrib['href'] = fn
+						urllib.urlretrieve(ex_url, files_path + fn)
+					l.attrib['href'] = html_file_prefix + fn
 			print l.items()
 		print tid
 		for l in self.doc.findall(".//script"):
 			for attr in l.items():
 				if 'src' == attr[0]:
 					(ex_url, fn) = self.url_to_filename(attr[1], url, files_path)
-					if not os.path.exists(fn):
+					if not os.path.exists(files_path + fn):
 						print 'Downloading... %s'%ex_url
-						urllib.urlretrieve(ex_url, fn)
-					l.attrib['src'] = fn
+						urllib.urlretrieve(ex_url, files_path + fn)
+					l.attrib['src'] = html_file_prefix + fn
 			print l.items()
 
 		html_data = lxml.etree.tostring(self.doc)
@@ -255,18 +259,20 @@ class Iichan_parser(object):
 		for p in posts:
 			if p.thumb <> None:
 				(ex_url, fn) = self.url_to_filename(p.thumb, url, files_path)
-				if not os.path.exists(fn):
+				if not os.path.exists(files_path + fn):
 					print 'Downloading... %s'%ex_url
-					urllib.urlretrieve(ex_url, fn)
-				html_data = html_data.replace('=\"%s\"'%p.thumb, '=\"%s\"'%fn)
+					urllib.urlretrieve(ex_url, files_path + fn)
+				html_data = html_data.replace('=\"%s\"'%p.thumb, '=\"%s%s\"'%(html_file_prefix, fn))
 			if p.img <> None:
 				(ex_url, fn) = self.url_to_filename(p.img, url, files_path)
-				if not os.path.exists(fn):
+				if not os.path.exists(files_path + fn):
 					print 'Downloading... %s'%ex_url
-					urllib.urlretrieve(ex_url, fn)
-				html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s\"'%fn)
+					urllib.urlretrieve(ex_url, files_path + fn)
+				html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s%s\"'%(html_file_prefix, fn))
 
 		fn = '%s.html'%tid
+		if path <> None:
+			fn = '%s/%s'%(path, fn)
 		f = open(fn, 'w')
 		f.write(html_data)
 		f.close()
@@ -279,4 +285,6 @@ if __name__=='__main__':
 	#ip.save_local('http://iichan.hk/b/res/2716929.html')
 	#ip.save_local('http://iichan.hk/b/res/2811895.html')
 
-	ip.save_local('http://iichan.hk/to/res/96318.html')
+	#ip.save_local('http://iichan.hk/to/res/148288.html', path='to')
+	ip.save_local('http://iichan.hk/b/res/2816200.html', path='b')
+
