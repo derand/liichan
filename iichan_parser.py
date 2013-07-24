@@ -193,11 +193,6 @@ class Iichan_parser(object):
 				if reply != None:
 					posts.append(reply)
 
-
-		#import lxml.etree as et
-		#print et.tostring(self.doc, pretty_print=True)
-		#sys.exit()
-
 		return posts		
 
 	def parse_url(self, url):
@@ -217,7 +212,7 @@ class Iichan_parser(object):
 		#fn = '%s/%s'%(files_path, fn)
 		return (expanded_url, fn)
 
-	def save_local(self, url, path=None):
+	def save_local(self, url, path=None, suffix=None):
 		html_data = self.html_data(url)
 		tid = self.thread_id(html_data)
 		posts = self.parse_data(html_data, tid)
@@ -271,6 +266,8 @@ class Iichan_parser(object):
 				html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s%s\"'%(html_file_prefix, fn))
 
 		fn = '%s.html'%tid
+		if suffix <> None:
+			fn = '%s_%s.html'%(tid, suffix)
 		if path <> None:
 			fn = '%s/%s'%(path, fn)
 		f = open(fn, 'w')
@@ -286,5 +283,5 @@ if __name__=='__main__':
 	#ip.save_local('http://iichan.hk/b/res/2811895.html')
 
 	#ip.save_local('http://iichan.hk/to/res/148288.html', path='to')
-	ip.save_local('http://iichan.hk/b/res/2816200.html', path='b')
+	ip.save_local('http://iichan.hk/b/res/2814234.html', path='b', suffix='научно-фантастические_мысли')
 
