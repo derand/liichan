@@ -33,44 +33,6 @@ class Post(object):
 		return '%s %s %s'%(time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime(self.time)), self.title.encode('utf-8'), self.img)
 
 
-"""
-first post:
-<form id="delform" action="/cgi-bin/wakaba.pl/b/" method="post">
-  <div id="thread-2524447">
-    <span class="filesize">Файл: <a target="_blank" href="/b/src/1351873989666.jpg">1351873989666.jpg</a>  - (<em>54 KB, 401x600</em>)</span>
-    &nbsp;<br /> 
-    <a target="_blank" href="/b/src/1351873989666.jpg"> <img src="/b/thumb/1351873989666s.jpg" width="133" height="200" alt="54 KB" class="thumb" /></a>
-    <a name="2524447"></a>
-    <label>
-      <input type="checkbox" name="delete" value="2524447" />
-      <span class="filetitle">Stranger story</span>
-      <span class="postername">Сырно</span>
-         Пт 02 ноября 2012 20:33:09
-    </label>
-    <span class="reflink">
-      <a href="javascript:insert('&gt;&gt;2524447')">&#x2116;2524447</a>
-    </span>&nbsp;
-    <blockquote> <p>Ветер. Резкий&#44; холодный&#44; неприветливый. ... <p><em>2. Ну этих людей. Тем более уже поздно&#44; могут и не так понять меня. Уж лучше пойду в парк&#44; а с утра найду себе новый дом.</em></p>
-    </blockquote>
-
-reply:
-<table><tbody>
-  <tr>
-    <td class="doubledash">&gt;&gt;</td>
-    <td class="reply" id="reply2524474">
-      <a name="2524474"></a>
-      <label><input type="checkbox" name="delete" value="2524474" /><span class="replytitle"></span> <span class="commentpostername">Сырно</span>   Пт 02 ноября 2012 20:57:33</label>
-      <span class="reflink">  <a href="javascript:insert('&gt;&gt;2524474')">&#x2116;2524474</a> </span>
-      &nbsp;  <br /> 
-      <span class="filesize">Файл: <a target="_blank" href="/b/src/1351875453692.jpg">1351875453692.jpg</a>  - (<em>80 KB, 599x358</em>)</span>
-      &nbsp;<br />
-      <a target="_blank" href="/b/src/1351875453692.jpg"> <img src="/b/thumb/1351875453692s.jpg" width="200" height="119" alt="80 KB" class="thumb" /></a>
-      <blockquote> <blockquote class="unkfunc">&gt;rpg<br />&gt;gensokyo<br />&gt;гг=imbalanced magi</blockquote>  </blockquote>
-    </td>
-  </tr></tbody>
-</table>
-"""
-
 class Iichan_parser(object):
 	def __init__(self):
 		super(Iichan_parser, self).__init__()
@@ -290,7 +252,9 @@ class Iichan_parser(object):
 
 if __name__=='__main__':
 	ip = Iichan_parser()
-	#ip.save_local('http://iichan.hk/to/res/148288.html', path='to')
+	ip.copy_wakaba3_js = True
+	#ip.save_local('http://iichan.hk/to/res/140802.html', path='to')
 	#ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
-	ip.save_local('http://iichan.hk/o/res/19273.html#i19273', path='o', suffix='Алиса')
+	#ip.save_local('http://iichan.hk/o/res/19273.html', path='o', suffix='Алиса')
+	ip.save_local('http://iichan.hk/b/res/2789869.html', path='b', suffix='безумных_умений_тред_20')
 
