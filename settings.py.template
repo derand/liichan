@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+'''
+	For thread_downloader script, rename this file to settings.py
+'''
+
+threads = [
+	{
+		'url':			'http://iichan.hk/b/res/2816200.html',
+		'path':			'b',
+		'suffix':		'cписок_неймфагов',
+		'frequency':	0,
+	},
+]

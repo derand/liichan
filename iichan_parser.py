@@ -14,6 +14,7 @@ import time
 import string
 import urlparse
 import os
+import shutil
 
 
 class Post(object):
@@ -74,6 +75,7 @@ class Iichan_parser(object):
 	def __init__(self):
 		super(Iichan_parser, self).__init__()
 		self.doc = None
+		self.copy_wakaba3_js = False
 
 
 	def parse_post_title(self, label, post=None):
@@ -143,7 +145,11 @@ class Iichan_parser(object):
 
 	def html_data(self, url):
 		page = urllib.urlopen(url)
-		return page.read()
+		code = page.getcode()
+		if code == 200:
+			return page.read()
+		else:
+			return code
 		'''
 		fn = url.split('/')[-1]
 		f = open(fn, 'w')
@@ -197,7 +203,8 @@ class Iichan_parser(object):
 
 	def parse_url(self, url):
 		html_data = self.html_data(url)
-		return self.parse_data(html_data)
+		if not isinstance(html_data, int):
+			return self.parse_data(html_data)
 
 	def url_to_filename(self, url, source_url, files_path):
 		expanded_url = url
@@ -214,6 +221,8 @@ class Iichan_parser(object):
 
 	def save_local(self, url, path=None, suffix=None):
 		html_data = self.html_data(url)
+		if isinstance(html_data, int):
+			return html_data
 		tid = self.thread_id(html_data)
 		posts = self.parse_data(html_data, tid)
 
@@ -237,17 +246,19 @@ class Iichan_parser(object):
 						print 'Downloading... %s'%ex_url
 						urllib.urlretrieve(ex_url, files_path + fn)
 					l.attrib['href'] = html_file_prefix + fn
-			print l.items()
 		print tid
 		for l in self.doc.findall(".//script"):
 			for attr in l.items():
 				if 'src' == attr[0]:
 					(ex_url, fn) = self.url_to_filename(attr[1], url, files_path)
 					if not os.path.exists(files_path + fn):
-						print 'Downloading... %s'%ex_url
-						urllib.urlretrieve(ex_url, files_path + fn)
+						if fn == 'wakaba3.js' and self.copy_wakaba3_js and os.path.exists(fn):
+							print 'Copy... %s'%fn
+							shutil.copyfile(fn, files_path + fn)
+						else:
+							print 'Downloading... %s'%ex_url
+							urllib.urlretrieve(ex_url, files_path + fn)
 					l.attrib['src'] = html_file_prefix + fn
-			print l.items()
 
 		html_data = lxml.etree.tostring(self.doc)
 		# download images and replace urls in posts
@@ -273,15 +284,12 @@ class Iichan_parser(object):
 		f = open(fn, 'w')
 		f.write(html_data)
 		f.close()
+		return 0
 
 
 
 if __name__=='__main__':
 	ip = Iichan_parser()
-	#ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2524447.html')
-	#ip.save_local('http://iichan.hk/b/res/2716929.html')
-	#ip.save_local('http://iichan.hk/b/res/2811895.html')
-
 	#ip.save_local('http://iichan.hk/to/res/148288.html', path='to')
-	ip.save_local('http://iichan.hk/b/res/2814234.html', path='b', suffix='научно-фантастические_мысли')
+	ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
 
