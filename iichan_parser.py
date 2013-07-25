@@ -76,6 +76,7 @@ class Iichan_parser(object):
 		super(Iichan_parser, self).__init__()
 		self.doc = None
 		self.copy_wakaba3_js = False
+		self.posts = None
 
 
 	def parse_post_title(self, label, post=None):
@@ -224,7 +225,7 @@ class Iichan_parser(object):
 		if isinstance(html_data, int):
 			return html_data
 		tid = self.thread_id(html_data)
-		posts = self.parse_data(html_data, tid)
+		self.posts = self.parse_data(html_data, tid)
 
 		parsed_uri = urlparse.urlparse(url)
 		host = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
@@ -246,7 +247,6 @@ class Iichan_parser(object):
 						print 'Downloading... %s'%ex_url
 						urllib.urlretrieve(ex_url, files_path + fn)
 					l.attrib['href'] = html_file_prefix + fn
-		print tid
 		for l in self.doc.findall(".//script"):
 			for attr in l.items():
 				if 'src' == attr[0]:
@@ -262,7 +262,7 @@ class Iichan_parser(object):
 
 		html_data = lxml.etree.tostring(self.doc)
 		# download images and replace urls in posts
-		for p in posts:
+		for p in self.posts:
 			if p.thumb <> None:
 				(ex_url, fn) = self.url_to_filename(p.thumb, url, files_path)
 				if not os.path.exists(files_path + fn):
@@ -291,5 +291,6 @@ class Iichan_parser(object):
 if __name__=='__main__':
 	ip = Iichan_parser()
 	#ip.save_local('http://iichan.hk/to/res/148288.html', path='to')
-	ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
+	#ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
+	ip.save_local('http://iichan.hk/o/res/19273.html#i19273', path='o', suffix='Алиса')
 
