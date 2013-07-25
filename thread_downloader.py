@@ -26,7 +26,6 @@ if __name__=='__main__':
 	status = {}
 	if os.path.exists(status_fn):
 		status = json.loads(open(status_fn, 'r').read())
-		print status
 	
 	parser_param_names = ['url', 'path', 'suffix']
 	ip = Iichan_parser()
@@ -42,6 +41,9 @@ if __name__=='__main__':
 				frequency = status[status_key]['frequency']
 		else:
 			status[status_key] = {}
+
+		if th.has_key('suffix'):
+			status[status_key]['suffix'] = th['suffix']
 
 		if th.has_key('path') and not os.path.exists(th['path']):
 			os.makedirs(th['path'])
