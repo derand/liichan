@@ -1,0 +1,11 @@
+
+# settings #
+settings.py
+status
+
+# python compiled files #
+*.pyc
+
+example.html
+
+

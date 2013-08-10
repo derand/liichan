@@ -39,6 +39,9 @@ class Iichan_parser(object):
 		self.doc = None
 		self.copy_wakaba3_js = False
 		self.posts = None
+		self.path = None
+		self.suffix = None
+		self.use_local = False
 
 
 	def parse_post_title(self, label, post=None):
@@ -106,13 +109,29 @@ class Iichan_parser(object):
 						break
 		return post
 
-	def html_data(self, url):
-		page = urllib.urlopen(url)
-		code = page.getcode()
-		if code == 200:
-			return page.read()
-		else:
-			return code
+	def build_thread_html_filename(self, tid):
+		fn = '%s.html'%tid
+		if self.suffix <> None:
+			fn = '%s_%s.html'%(tid, self.suffix)
+		if self.path <> None:
+			fn = '%s/%s'%(self.path, fn)
+		return fn
+
+	def html_data(self, url, ignore_local=False):
+		page = None
+		if ignore_local==False and self.use_local:
+			tid = self.thread_id_from_url(url)
+			fn = self.build_thread_html_filename(tid)
+			if os.path.exists(fn):
+				page = open(fn, 'r').read()
+		if page==None:
+			page = urllib.urlopen(url)
+			code = page.getcode()
+			if code == 200:
+				return page.read()
+			else:
+				return code
+		return page
 		'''
 		fn = url.split('/')[-1]
 		f = open(fn, 'w')
@@ -122,8 +141,10 @@ class Iichan_parser(object):
 		return open(url.split('/')[-1], 'r').read()
 		'''
 
+	def thread_id_from_url(self, url):
+		return url.split('/')[-1].split('.')[0]
+
 	def thread_id(self, html_data):
-		#tid = url.split('/')[-1].split('.')[0]
 		sign = 'id="thread-'
 		idx = html_data.find(sign)
 		idx += len(sign)
@@ -183,7 +204,9 @@ class Iichan_parser(object):
 		return (expanded_url, fn)
 
 	def save_local(self, url, path=None, suffix=None):
-		html_data = self.html_data(url)
+		self.path = path
+		self.suffix = suffix
+		html_data = self.html_data(url, True)
 		if isinstance(html_data, int):
 			return html_data
 		tid = self.thread_id(html_data)
@@ -193,8 +216,8 @@ class Iichan_parser(object):
 		host = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
 
 		html_file_prefix = '%s_files/'%tid
-		if path <> None:
-			files_path = '%s/%s'%(path, html_file_prefix)
+		if self.path <> None:
+			files_path = '%s/%s'%(self.path, html_file_prefix)
 		else:
 			files_path = html_file_prefix
 		if not os.path.exists(files_path) or not os.path.isdir(files_path):
@@ -238,16 +261,11 @@ class Iichan_parser(object):
 					urllib.urlretrieve(ex_url, files_path + fn)
 				html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s%s\"'%(html_file_prefix, fn))
 
-		fn = '%s.html'%tid
-		if suffix <> None:
-			fn = '%s_%s.html'%(tid, suffix)
-		if path <> None:
-			fn = '%s/%s'%(path, fn)
+		fn = self.build_thread_html_filename(tid)
 		f = open(fn, 'w')
 		f.write(html_data)
 		f.close()
 		return 0
-
 
 
 if __name__=='__main__':
@@ -256,5 +274,5 @@ if __name__=='__main__':
 	#ip.save_local('http://iichan.hk/to/res/140802.html', path='to')
 	#ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
 	#ip.save_local('http://iichan.hk/o/res/19273.html', path='o', suffix='Алиса')
-	ip.save_local('http://iichan.hk/b/res/2789869.html', path='b', suffix='безумных_умений_тред_20')
+	ip.save_local('http://iichan.hk/b/arch/res/2716809.html', path='b', suffix='безумных_умений_тред_19')
 
