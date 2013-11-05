@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = '0.01'
+__version__ = '0.02'
 __author__ = 'Andrey Derevyagin'
 __copyright__ = 'Copyright © 2013'
 
@@ -28,6 +28,7 @@ class Post(object):
 		self.thumb = None
 		self.img = None
 		self.id = None
+		self.lxml_data = None
 
 	def __str__(self):
 		return '%s %s %s'%(time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime(self.time)), self.title.encode('utf-8'), self.img)
@@ -57,6 +58,16 @@ class Iichan_parser(object):
 							post.title = el.text_content().strip()
 						if 'postername' == attr[1] or 'commentpostername' == attr[1]:
 							post.poster = el.text_content().strip()
+			if 'input' == el.tag:
+				pid = None
+				c = 0
+				for attr in el.items():
+					if ('type' == attr[0] and 'checkbox' == attr[1]) or ('name' == attr[0] and 'delete' == attr[1]):
+						c += 1
+					if 'value' == attr[0] and attr[1].isdigit():
+						pid = int(attr[1])
+				if c == 2 and pid <> None:
+					post.id = pid
 
 			tmp = el.text_content().strip()
 			if len(tmp)>0:
@@ -154,6 +165,9 @@ class Iichan_parser(object):
 		tid = html_data[idx:idx+i]
 		return tid
 
+	def stringify_children(self, node):
+		rv = lxml.etree.tostring(node, encoding='utf-8', method='html').strip()
+		return rv[len('<blockquote>'):-1*len('</blockquote>')].strip()
 
 	def parse_data(self, html_data, tid=None):
 		if tid == None:
@@ -162,14 +176,16 @@ class Iichan_parser(object):
 		self.doc = lxml.html.document_fromstring(html_data)
 		start_post = self.doc.get_element_by_id('thread-%s'%tid, None)
 		posts = [Post(), ]
+		posts[0].lxml_data = start_post
 		for el in start_post.iterchildren():
-			if 'label' == el.tag:
-				posts[0] = self.parse_post_title(el, posts[0])
-			elif 'blockquote' == el.tag:
-				posts[0].post = el.text_content
-			elif 'a' == el.tag:
-				posts[0] = self.parse_post_img(el, posts[0])
-			elif 'table' == el.tag:
+			if len(posts) == 1:
+				if 'label' == el.tag:
+					posts[0] = self.parse_post_title(el, posts[0])
+				elif 'blockquote' == el.tag:
+					posts[0].post = self.stringify_children(el) #el.text_content
+				elif 'a' == el.tag:
+					posts[0] = self.parse_post_img(el, posts[0])
+			if 'table' == el.tag:
 				reply = None
 				for el2 in el.find_class('reply')[0].iterchildren():
 					if 'label' == el2.tag:
@@ -177,10 +193,11 @@ class Iichan_parser(object):
 					elif 'blockquote' == el2.tag:
 						if reply == None:
 							reply = Post()
-						reply.post = el2.text_content
+						reply.post = self.stringify_children(el.find('.//blockquote')) #el2.text_content
 					elif 'a' == el2.tag:
 						reply = self.parse_post_img(el2, reply)
 				if reply != None:
+					reply.lxml_data = el
 					posts.append(reply)
 
 		return posts		
@@ -202,6 +219,15 @@ class Iichan_parser(object):
 		fn = url.split('/')[-1]
 		#fn = '%s/%s'%(files_path, fn)
 		return (expanded_url, fn)
+
+	def __replace_href_src(self, tag, old, new):
+		for attr in tag.items():
+			if ('href' == attr[0] or 'src' == attr[0]) and attr[1] == old:
+				tag.attrib[attr[0]] = new
+				break
+		for t in tag.iterchildren():
+			if 'table' <> t.tag:
+				self.__replace_href_src(t, old, new)
 
 	def save_local(self, url, path=None, suffix=None):
 		self.path = path
@@ -245,7 +271,8 @@ class Iichan_parser(object):
 							urllib.urlretrieve(ex_url, files_path + fn)
 					l.attrib['src'] = html_file_prefix + fn
 
-		html_data = lxml.etree.tostring(self.doc)
+		html_data = lxml.etree.tostring(self.doc, encoding='utf-8', method='html')
+		#html_data = lxml.etree.tostring(self.doc)
 		# download images and replace urls in posts
 		for p in self.posts:
 			if p.thumb <> None:
@@ -253,18 +280,34 @@ class Iichan_parser(object):
 				if not os.path.exists(files_path + fn):
 					print 'Downloading... %s'%ex_url
 					urllib.urlretrieve(ex_url, files_path + fn)
-				html_data = html_data.replace('=\"%s\"'%p.thumb, '=\"%s%s\"'%(html_file_prefix, fn))
+				#html_data = html_data.replace('=\"%s\"'%p.thumb, '=\"%s%s\"'%(html_file_prefix, fn))
+				self.__replace_href_src(p.lxml_data, p.thumb, '%s%s'%(html_file_prefix, fn))
 			if p.img <> None:
 				(ex_url, fn) = self.url_to_filename(p.img, url, files_path)
 				if not os.path.exists(files_path + fn):
 					print 'Downloading... %s'%ex_url
 					urllib.urlretrieve(ex_url, files_path + fn)
-				html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s%s\"'%(html_file_prefix, fn))
+				#html_data = html_data.replace('=\"%s\"'%p.img, '=\"%s%s\"'%(html_file_prefix, fn))
+				self.__replace_href_src(p.lxml_data, p.img, '%s%s'%(html_file_prefix, fn))
+
+		# prepare document
+		# delete post form
+		post_form = self.doc.get_element_by_id('postform')
+		if post_form != None:
+			post_form.getparent().remove(post_form)
+		for del_form in self.doc.find_class('userdelete'):
+			del_form.getparent().remove(del_form)
+
+		# add '<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />'
+		meta = lxml.etree.Element('meta', content='text/html;charset=utf-8')
+		meta.attrib['http-equiv'] = 'Content-Type'
+		self.doc.find('head').find('title').addnext(meta)
 
 		fn = self.build_thread_html_filename(tid)
 		f = open(fn, 'w')
-		f.write(html_data)
+		f.write(lxml.html.tostring(self.doc, encoding='UTF-8', method="html", pretty_print=False))
 		f.close()
+
 		return 0
 
 
@@ -274,5 +317,64 @@ if __name__=='__main__':
 	#ip.save_local('http://iichan.hk/to/res/140802.html', path='to')
 	#ip.save_local('http://iichan.hk/b/res/2816200.html', path='b', suffix='cписок_неймфагов')
 	#ip.save_local('http://iichan.hk/o/res/19273.html', path='o', suffix='Алиса')
-	ip.save_local('http://iichan.hk/b/arch/res/2716809.html', path='b', suffix='безумных_умений_тред_19')
+	ip.save_local('http://iichan.hk/to/arch/res/70160.html', path='to', suffix='Рейму_одинокая')
 
+	"""
+	### JaTT
+	ip.save_local('http://iichan.hk/b/arch/res/1985140.html', suffix='JaTT_01', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/1992801.html', suffix='JaTT_02', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/1997646.html', suffix='JaTT_03', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2003765.html', suffix='JaTT_04', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2011828.html', suffix='JaTT_05', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2020107.html', suffix='JaTT_06', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2027033.html', suffix='JaTT_07', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2037243.html', suffix='JaTT_08', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2045885.html', suffix='JaTT_09', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2056256.html', suffix='JaTT_10', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2063007.html', suffix='JaTT_11', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2067652.html', suffix='JaTT_12', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2073394.html', suffix='JaTT_13', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2079467.html', suffix='JaTT_14', path='b/Just another Touhou thread')
+	ip.save_local('http://iichan.hk/b/arch/res/2088750.html', suffix='JaTT_15', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2093892.html', suffix='JaTT_16', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2105188.html', suffix='JaTT_17', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2115341.html', suffix='JaTT_18', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2131564.html', suffix='JaTT_19', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2136719.html', suffix='JaTT_20', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2143503.html', suffix='JaTT_21', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2149494.html', suffix='JaTT_22', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2155312.html', suffix='JaTT_23', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2160194.html', suffix='JaTT_24', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2171945.html', suffix='JaTT_25', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2193149.html', suffix='JaTT_26', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2206373.html', suffix='JaTT_27', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2215979.html', suffix='JaTT_28', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2223862.html', suffix='JaTT_29', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2228397.html', suffix='JaTT_30', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2238293.html', suffix='JaTT_31', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2248241.html', suffix='JaTT_32', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2279232.html', suffix='JaTT_33', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2300134.html', suffix='JaTT_34', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2356400.html', suffix='JaTT_35', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2363770.html', suffix='JaTT_36', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2374045.html', suffix='JaTT_37', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2389566.html', suffix='JaTT_38', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2400252.html', suffix='JaTT_39', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2418761.html', suffix='JaTT_40', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2430713.html', suffix='JaTT_41', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2462521.html', suffix='JaTT_42', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2491116.html', suffix='JaTT_43', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2527969.html', suffix='JaTT_44', path='b/Just another Touhou thread')
+
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2550876.html', suffix='JaTT_45', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2583675.html', suffix='JaTT_46', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2608355.html', suffix='JaTT_47', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2639989.html', suffix='JaTT_48', path='b/Just another Touhou thread')
+	ip.save_local('http://gensokyo.4otaku.org/arch/b/res/2705302.html', suffix='JaTT_49', path='b/Just another Touhou thread')
+	"""
